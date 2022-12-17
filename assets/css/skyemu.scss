@@ -1,0 +1,274 @@
+    .skyemu{
+        >.container{
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            margin: 0px;
+            padding: 0px;
+            >canvas{
+                position: relative;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                top: 0;
+                height: 100%;
+                width: 100%;
+            }
+        }
+        .menu:not([hidden]) {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            flex-wrap: nowrap;
+            align-items: center;
+            padding: 0px 10px;
+            height: 30px;
+            >.menubtn,>.downbtn{
+                border: 0;
+                width: 1.5rem;
+                height: 1.5rem;
+                position: relative;
+                border-color: transparent;
+                background-color: transparent;
+                border-radius: 4px;
+                >span{
+                    position: absolute;
+                    margin: auto;
+                    left: 0;
+                    top: 0;
+                    right: 0;
+                    bottom: 0;
+                    background:#fff;
+                    &:after,
+                    &:before {
+                        content: "";
+                        display: block;
+                        background: inherit;
+                        position: absolute;
+                    }
+                }
+                &:hover{
+                    background: #00c1ed;
+                    color: #fff;
+                }
+            }
+            >.menubtn {
+                >span {
+                    height: 2px;
+                    width: 1.25rem;
+                    &:after,
+                    &:before {
+                        height: inherit;
+                        width: inherit;
+                        border-radius: inherit;
+                        transition: inherit;
+                        left: 0;
+                    }
+                }
+    
+                &:not([class~='active']) {
+                    >span {
+                        transform: rotate(0deg);
+                        transition: transform .1s, margin .3s, opacity 0s .3s;
+                        &:after,
+                        &:before {
+                            transform: rotate(0deg);
+                        }
+    
+                        &:before {
+                            margin-top: -.45em;
+                        }
+    
+                        &:after {
+                            margin-top: .45em;
+                        }
+                    }
+                }
+                &.active {
+                    >span {
+                        transform: rotate(-45deg);
+                        transition: margin .3s, transform .3s .3s, opacity 0s .3s;
+    
+                        &:before {
+                            margin-top: 0;
+                            transform: rotate(-90deg);
+                        }
+    
+                        &:after {
+                            margin-top: 0;
+                            transform: rotate(90deg);
+                            opacity: 0;
+                        }
+                    }
+                }
+            }
+            >.downbtn {
+                >span {
+                    width: 3px;
+                    height: 50%;
+                    &:after {
+                        margin-left: 3px;
+                        transform: rotate(45deg);
+    
+                    }
+    
+                    &:before {
+                        margin-left: -3px;
+                        transform: rotate(-45deg);
+    
+                    }
+                    &:after,
+                    &:before {
+                        height: 10px;
+                        width: 3px;
+                        top: 50%;
+                    }
+                }
+            }
+            .title {
+                flex-grow: 1;
+                overflow: hidden;
+                text-align: center;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: .675rem;
+            }
+            .menu-list{
+                position: absolute;
+                bottom: 100%;
+                left: 0;
+                background: #000;
+                color: #fff;
+                border: 1px solid #726a6a;
+                border-radius: 5px;
+                margin: auto;
+                padding: 20px;
+                transition: left .3s;
+                width:min(30vw,150px);
+                button{
+                    display: inline-block;
+                    background: linear-gradient(360deg, #0238ff, #00b1f5);
+                    color: #fff;
+                    border-radius: 5px;
+                    padding: 3px;
+                    border: 1px solid #0f64ff;
+                    outline: none;
+                    font-size: 0.675rem;
+                    text-align: left;
+                    margin-bottom: 10px;
+                    margin-right: 10px;
+                }
+                li{
+                    margin-bottom: 2px;
+                    position: relative;
+                    >a{
+                        word-break: break-all;
+                        color: #fff;
+                    }
+                    >ul{position: fixed;
+                        background: #000;
+                        border: 1px solid #726a6a;
+                        border-radius: 5px;
+                        bottom: 30px;
+                        width: calc(100vw - min(30vw, 150px) - 70px);
+                        height: 75vh;
+                        display: flex;
+                        flex-direction: column;
+                        flex-wrap: nowrap;
+                        align-items: flex-start;
+                        overflow: hidden;
+                        overflow-y: auto;
+                        padding-left: 25px;
+                        justify-content: flex-start;
+                        li{
+                            >p{
+                                margin: 0px;
+                                font-size: .675rem;
+                                &:hover{
+                                    background-color: #075eff;
+                                    color: #fff;
+                                }  
+                            }
+                        }
+                    }
+                    &:not([class~='active']){
+                        >ul{
+                            right: -200%;
+                            transition: right 0.3s;
+                        }
+                    }
+                    &.active{
+                        >ul{
+                            right: 0;
+                            transition: right 0.2s;
+                        }
+                    }
+                }
+            }
+            .menubtn:not([class~='active']) ~ .menu-list{
+                left: -100vw;
+                transition: left .3s;
+            }
+        }
+        &.active {
+            display: inline-block;
+            >.menu{
+                border: 1px solid #000;
+                border-radius: 5px;
+                color: #fff;
+                background:linear-gradient(0deg, #075eff, #00e2f9);
+                >.menubtn{
+                    margin-right: 10px;
+                }
+                >.downbtn{
+                    margin-left: 10px;
+                }
+                >.downbtn,>.menubtn{
+                    &:hover {
+                        background: #ff9900;
+                    }
+                    span::before,span::after,span{
+                        background-color: #fff;
+                    }
+                }
+            }
+            >.menu + .container {
+                height: 0px;
+                width: 0px;
+                top:30px;
+                overflow: hidden;
+            }
+        }
+        &:not([class~='active']) {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+            .menu{
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                color: #fff;
+                z-index: 101;
+                background-color: #000;
+                background-image:linear-gradient(0deg, black, #545151);
+            }
+            .container{
+                width: 100%;
+    
+            }
+            >.menu:not([hidden])+.container {
+                bottom: 30px;
+                height: calc(100vh - 30px);
+            }
+            >.menu[hidden]+.container {
+                top: 0;
+                bottom: 0;
+                height: 100vh;
+            }
+        }
+    }
