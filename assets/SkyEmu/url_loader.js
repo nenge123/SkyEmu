@@ -16,7 +16,7 @@ Nenge.docload(function(){
             T.once(elm,'pointerup',async()=>{
                 Nttr(elm).removeClass('loading');
             elm.innerHTML='请稍等!';
-            let loaderjs = await T.getScript('assets/vba/emu-loader.js?t='+T.time,{process:e=>{
+            let loaderjs = await T.getScript('assets/SkyEmu/emu-loader.js?t='+T.time,{process:e=>{
                 elm.innerHTML = '加载引导文件:'+e;
             }});
             if(!loaderjs)alert('网络错误!');
