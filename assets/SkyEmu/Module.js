@@ -71,7 +71,6 @@ var Module = new class NengeModule{
             let CacheFile = await T.FetchItem({
                 url: M.JSpath + 'SkyEmu.zip', store: 'data-libjs',version: M.version, unpack: true,
                 process: e => {
-                    //if(selm)selm.innerHTML = `44gba.zip : ${e}`;
                 },
                 packtext: M.getLang('unpack'),
             });
@@ -124,6 +123,12 @@ var Module = new class NengeModule{
             ).replace(
                 /document\.body\.append/g,
                 'Module.emuElm.$(".container").append'
+            ).replace(
+                /var\s?(\w+?)\s?=\s?\w+?\.softFullscreen\s?\?\s?innerWidth\s?:\s?\w+?\.width;/,
+                'var optk = Module.canvas.parentNode.getBoundingClientRect();var $1 = optk.width;'
+            ).replace(
+                /var\s?(\w+?)\s?=\s?\w+?\.softFullscreen\s?\?\s?innerHeight\s?:\s?\w+?\.height;/,
+                'var $1 = optk.height;'
             );
         },
         InitAudioContext(sample_rate,num_channels, buffer_size,__saudio_emsc_pull,HEAPF32){
@@ -323,7 +328,8 @@ var Module = new class NengeModule{
                 T.I.toArr(u8,
                     async entry=>{
                         M.F.MKFILE('/rooms/'+entry[0],entry[1]);
-                        if(/\.gba$/.test(entry[0])){
+                        if(/\_\_MACOSX\//.test(entry[0])) return;
+                        if(/\.(gba|gb|gbc)$/.test(entry[0])){
                             if(!block){
                                 block = true;
                                 M.LocalGame = '/rooms/'+entry[0];
@@ -345,7 +351,7 @@ var Module = new class NengeModule{
     set GameName(name){
         name = this.T.F.getname(name);
         this.GameFullName = name;
-        this.GameTitle = name.replace(/\.gba/i,'');
+        this.GameTitle = name.replace(/\.(gba|gb|gbc)/i,'');
         this.$('.title').innerHTML = name;
     }
     F = new class NengeDisk {
