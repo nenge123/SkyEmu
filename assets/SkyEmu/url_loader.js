@@ -29,8 +29,8 @@ Nenge.docload(function(){
                 elm.innerHTML = '加载引导文件:'+e;
             },store:'data-libjs'});
              * */ 
-            elm.Module = (new Function('Nenge,elm',loaderjs+';return Module'))(T,elm);
-            elm.Module.StartVBA = async ()=>{
+            elm.Module = (new Function('Nenge,thisELM',loaderjs+';return Module'))(T,elm);
+            elm.Module.StartEMU = async ()=>{
                 let gamepath = T.attr(elm,'data-path');
                 let version = T.attr(elm,'data-version');
                 console.log(version);

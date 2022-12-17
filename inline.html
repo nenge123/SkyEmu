@@ -1,0 +1,35 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no,width=device-width">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta http-equiv="cache-control" content="no-cache" />
+    <meta name="x-content-type-options" content="nosniff" />
+    <meta name="renderer" content="webkit">
+    <title data-lang="">SkyEmu</title>
+</head>
+
+<body>
+    <h1>网站部署法</h1>
+    <p><code>&lt;emu-skyemu data-path="1.gba"&gtsome text 显示内容 &lt;emu-skyemu&gt;<br>&lt;script type="text/javascript" src="assets/vba/run.js"&gt;&lt;/script&gt;</code></p>
+    <p>data-path:file Path, support zip/rar4/7z/gba/gbc/gb 设置游戏路径,相对当前网站目录,可以是压缩文件,哪怕改了名字的压缩文件照样能行.压缩文件存在多个skyemu只会启动其中一个.</p>
+    <p>data-version:set file version,if version not save local then updata设置游戏版本,如果本地不一致则更新</p>
+    <p>更多查看run.js注释</p>
+    <style>.runskyemu{border:#000000 1px solid;padding: 5px;margin: 5px;display:inline-block;background:linear-gradient(0deg,#00e7ff,#1573ff);border-radius: 5px;}</style>
+    <emu-skyemu data-path="1.zip" data-version="6">点击运行1.zip</emu-skyemu>
+    <script type="text/javascript" src="assets/js/common.js?1671167481"></script>
+    <script type="text/javascript" src="assets/SkyEmu/url_loader.js?1671167481"></script>
+    <textarea style="width:100%;height: 300px;" rows="10">
+        &lt;style&gt;.runskyemu{border:#000000 1px solid;padding: 5px;margin: 5px;display:inline-block;background:linear-gradient(0deg,#00e7ff,#1573ff);border-radius: 5px;}&lt;/style&gt;
+        &lt;emu-skyemu data-path="1.zip"&gt;点击运行1.zip&lt;/emu-skyemu&gt;
+        &lt;script type="text/javascript" src="assets/js/common.js"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript" src="assets/SkyEmu/url_loader.js"&gt;&lt;/script&gt;
+    </textarea>
+    <a href="app.html">APP Module</a>
+</body>
+</html>

@@ -133,7 +133,7 @@ var Module = new class NengeModule{
         },
         InitAudioContext(sample_rate,num_channels, buffer_size,__saudio_emsc_pull,HEAPF32){
             let M = this,T=M.T;
-            if (Module._saudio_context&&Module._saudio_context.state === "suspended") {
+            if (M._saudio_context&&M._saudio_context.state === "suspended") {
                 return 0;
             }
             M._saudio_context = new AudioContext({
@@ -156,7 +156,7 @@ var Module = new class NengeModule{
             };
             M._saudio_node.connect(M._saudio_context.destination);
             M._saudio_context.resume();
-            if (Module._saudio_context.state === "suspended") {
+            if (M._saudio_context.state === "suspended") {
                 T.on(document,'pointerdown',e=>{
                     M._saudio_context.resume();
                 });
@@ -164,11 +164,25 @@ var Module = new class NengeModule{
             }
             return 1;
         },
+        DiskReadyOut(){
+            let M = this;
+            M.ccall("se_load_settings");
+            if(M.StartEMU){
+                M.StartEMU();
+            }else{
+                let last = localStorage.getItem('skyemu-lastgame');
+                if(last){
+                    M.db.rooms.data(last).then(u8=>{
+                        M.runaction('writeRoom',[u8,last]);
+                    })
+                }
+            }
+
+        },
         install_FS(){
             let M = this;
             M.runaction('addMount',["/offline"]);
             M.F.mountReady().then(e=>{
-                Module.ccall("se_load_settings");
             });
         },
         addMount(path) {
@@ -187,7 +201,7 @@ var Module = new class NengeModule{
                 "ShowFS":"View FileSystem",
                 "miniWin":"Mini Window",
             },html="";
-            html+='<li><a href="https://github.com/skylersaleh/SkyEmu" target="_blank">Github:skylersaleh/skyemu</a></li>';
+            html+='<li><a href="inline.html" target="_blank">inline run</a></li><li><a href="https://github.com/skylersaleh/SkyEmu" target="_blank">Github:skylersaleh/skyemu</a></li>';
             T.I.toArr(list,entry=>{
                 html+=`<li><button type="button" data-act="${entry[0]}">${M.getLang(entry[1])}</button></li>`;
             });
@@ -268,8 +282,9 @@ var Module = new class NengeModule{
         },
         PathToHtml(key,root){
             let M=this,T=M.T,html="";
-            T.I.toArr(M.F.getLocalList(key),entry=>{
-                html +=`<li><p data-act="SeleteFSitem" data-key="${entry[0]}">${entry[0].replace(root,'')}</p><p>${entry[1].timestamp.toLocaleString()}</p></li>`;
+            T.I.toArr(M.F.getLocalList(key,!0),entry=>{
+                let p = entry[1].dir?'button':'p';
+                html +=  `<li><${p} data-act="SeleteFSitem" data-key="${entry[0]}">${entry[0].replace(root,'')}</${p}><p>${entry[1].timestamp.toLocaleString()}</p></li>`;
             });
             return html;
         },
@@ -305,6 +320,7 @@ var Module = new class NengeModule{
         async RunRoom(elm){
             let M=this,T=M.T;
             let key = T.attr(elm,'data-key');
+            localStorage.setItem('skyemu-lastgame',key);
             let u8 = await M.db.rooms.data(key);
             if(u8){
                 M.runaction('writeRoom',[u8,key,!0]);
@@ -320,9 +336,11 @@ var Module = new class NengeModule{
             if(u8 instanceof Uint8Array){
                 M.F.MKFILE('/rooms/'+filename,u8);
                 M.LocalGame = '/rooms/'+filename;
-                if(!bool)M.db.rooms.setData(filename,u8,{
+                if(!bool){
+                    localStorage.setItem('skyemu-lastgame',filename);
+                    M.db.rooms.setData(filename,u8,{
                     type:'Uint8Array'
-                });
+                });}
             }else if(u8){
                 let block = false;
                 T.I.toArr(u8,
@@ -333,12 +351,12 @@ var Module = new class NengeModule{
                             if(!block){
                                 block = true;
                                 M.LocalGame = '/rooms/'+entry[0];
+                                if(!bool)localStorage.setItem('skyemu-lastgame',entry[0]);
                             }
-                            if(!bool)M.db.rooms.setData(entry[0],entry[1],{
-                                type:'Uint8Array'
-                            });
-
                         }
+                        if(!bool)M.db.rooms.setData(entry[0],entry[1],{
+                            type:'Uint8Array'
+                        });
                     }
                 );
             }
@@ -575,7 +593,7 @@ var Module = new class NengeModule{
             callback && callback(result);
             return result
         }
-        getLocalList(mountpoint) {
+        getLocalList(mountpoint,bool) {
             mountpoint = mountpoint || '/';
             let D = this, T = D.T, FS = D.FS,
                 entries = {},
@@ -588,17 +606,17 @@ var Module = new class NengeModule{
                 let path = check.pop();
                 let stat = D.stat(path);
                 if (stat) {
-                    if (FS.isDir(stat.mode)) {
-                        check.push.apply(check, FS.readdir(path).filter(isRealDir).map(toAbsolute(path)))
-                    }
                     entries[path] = {
                         timestamp: stat.mtime
+                    }
+                    if (FS.isDir(stat.mode)) {
+                        if(!bool)check.push.apply(check, FS.readdir(path).filter(isRealDir).map(toAbsolute(path)));
+                        entries[path]['dir'] = true;
                     }
     
                 }
             }
             return entries;
-    
         }
         stat(path) {
             let D = this, FS = D.FS, pathinfo = FS.analyzePath(path);
@@ -762,9 +780,10 @@ var Module = new class NengeModule{
         };
         input.click();
     }
-    async FetchRoom(gamepath,version){
+    async FetchRoom(path,version){
         let M=this,T=M.T;
-        let u8 = await T.FetchItem({url:path,store:M.db.rooms,unpack:true});
-        return M.runaction('writeRoom',[u8,T.F.getname(path),!0]);
+        let u8 = await T.FetchItem({url:path,store:M.db.rooms,unpack:true}),key=T.F.getname(path);
+        localStorage.setItem('skyemu-lastgame',key);
+        return M.runaction('writeRoom',[u8,key,!0]);
     }
 }(Nenge,typeof thisELM != 'undefined'?thisELM:undefined);
