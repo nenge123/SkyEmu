@@ -13,9 +13,8 @@ var Module = new class NengeModule{
     functionmonitorRunDependencies(left) {
         this.totalDependencies = Math.max(this.totalDependencies, left);
     }
-
     constructor(T,elm){
-        let I = T.I;
+        let I = T.I,M=this;
         T.DB_NAME = 'Skyemu';
         T.LibStore = 'data-libjs';
         T.DB_STORE_MAP = {
@@ -24,29 +23,31 @@ var Module = new class NengeModule{
             'userdata': { 'timestamp': false },
             'data-libjs': {},
         };
-        I.defines(this, { T, I }, 1);
-        this.JSpath = T.JSpath.split('/').slice(0, -2).join('/') + '/SkyEmu/';
-        this.version = 1;
-        this.runaction = T.runaction;
-        this.getLang = T.getLang;
-        this.db = {
+        I.defines(M, { T, I }, 1);
+        M.JSpath = T.JSpath.split('/').slice(0, -2).join('/') + '/SkyEmu/';
+        M.version = 1;
+        M.runaction = T.runaction;
+        M.getLang = T.getLang;
+        M.db = {
             userdata:T.getStore('userdata'),
             rooms:T.getStore('rooms'),
             libjs:T.getStore('data-libjs'),
             "/offline":T.getStore('userdata'),
         };
         if(elm){
-            if(elm.JSpath)this.JSpath = elm.JSpath;
+            if(elm.JSpath)M.JSpath = elm.JSpath;
             elm.innerHTML = `<div class="skyemu"><div class="menu"><div class="menubtn"><span class="menu-icon"></span></div><div class="title"></div><div class="downbtn"><span class="menu-icon"></span></div><ul class="menu-list"></ul></div><div class="container"><canvas tabindex="-1"></canvas></div></div>`;
-            I.defines(elm, {Module:this}, 1);
+            I.defines(elm, {'Module':M}, 1);
         }else{
-            I.defines(T, {Module:this}, 1);
+            I.defines(T, {'Module':M}, 1);
         }
-        this.emuElm = Nttr(T.$('.skyemu',elm));
-        this.DB = this.db;
+        M.emuElm = Nttr(T.$('.skyemu',elm));
+        if(navigator.standalone){
+            M.emuElm.addClass('webapp');
+        }
+        M.DB = M.db;
         T.docload(async () =>{
-            await this.runaction('loadCores');
-            this.runaction('BuildMenu');
+            await M.runaction('loadCores');
         });
     }
     $(str){
@@ -58,31 +59,44 @@ var Module = new class NengeModule{
     Nttr(str){
         return Nttr(this.$(str));
     }
+    lang={};
     exit_path = ["/offline/recent_games.txt"];
     action = {
         async loadCores(){
             let M =this,T=M.T;
             M.canvas = M.$('canvas');
+            let title = M.$('.title');
             //下载语言包
             if(typeof USERLANG != 'undefined'){
                 M.lang = USERLANG[T.language];
+            }else{
+                M.lang = await T.FetchItem({
+                url: M.JSpath + 'language/' + T.language + '.json?t='+T.time,
+                'type': 'json',
+                'process':e=>{
+                    title.innerHTML = `language:${T.language} ${e}`;
+                }
+                });
             }
-            if(!M.lang)M.lang = await T.FetchItem({ url: M.JSpath + 'language/' + T.language + '.json?t='+T.time, 'type': 'json' });
             let CacheFile = await T.FetchItem({
-                url: M.JSpath + 'SkyEmu.zip', store: 'data-libjs',version: M.version, unpack: true,
+                url: M.JSpath + 'SkyEmu.zip', store: 'data-libjs',version: M.version,
+                unpack: true,
                 process: e => {
+                    title.innerHTML = `Skyemu Core:${e}`;
                 },
                 packtext: M.getLang('unpack'),
+                decode:e=>new TextDecoder().decode(e)
             });
-            let asmjs = new TextDecoder().decode(CacheFile['SkyEmu.js']);
+            let asmjs = typeof CacheFile['SkyEmu.js'] =='string'?CacheFile['SkyEmu.js']:new TextDecoder().decode(CacheFile['SkyEmu.js']);
             asmjs = M.runaction('replaceJS',[asmjs]);
             M.wasmBinary = CacheFile['SkyEmu.wasm'];
+            this.runaction('BuildMenu');
             (new Function('Module',asmjs))(M);
         },
         replaceJS(asmjs){
             return asmjs.replace(
                 /Module\["run"\]\s?=\s?run;/,
-                `;((m,n)=>{m.FS = FS;m.callMain = callMain;if(!m.HEAP8)m.HEAP8 = HEAP8;m.stop_runDependencies = ()=>{runDependencies = 0};m.run=run;Module.F.replaceWrite();})(Module,MEMFS);`
+                `;((m,n)=>{m.FS = FS;m.callMain = callMain;if(!m.HEAP8)m.HEAP8 = HEAP8;m.run=run;})(Module,MEMFS);`
 
             ).replace(
                 /WebAssembly\.instantiate\(binary, info\)/,
@@ -90,10 +104,12 @@ var Module = new class NengeModule{
             ).replace(
                 /\s*\w+?\.mkdir\("\/offline"\);/,
                 'return Module.runaction("install_FS");'
-            ).replace(
+            )
+            /*.replace(
                 /function\s?UTF8ArrayToString\(.+?\)\s\{/,
-                `function UTF8ArrayToString(heap, idx, maxBytesToRead){var endIdx = idx + maxBytesToRead;var endPtr = idx;if (!endIdx)while (heap[endPtr] && !(endPtr >= endIdx))++endPtr;elseendPtr = endIdx;var u8 = heap.subarray(idx, endPtr);if (typeof TextDecoder !== "undefined") {var u8txt = new TextDecoder("utf8").decode(u8),u8arr = new TextEncoder().encode(u8txt);if (Array.from(u8).join(',') != Array.from(u8arr).join(','))u8txt = new TextDecoder("gbk").decode(u8);return u8txt;}`
-            ).replace(
+                `function UTF8ArrayToString(heap, idx, maxBytesToRead){var endIdx = idx + maxBytesToRead;var endPtr = idx;if (!endIdx)while (heap[endPtr] && !(endPtr >= endIdx))++endPtr;elseendPtr = endIdx;var u8 = heap.subarray(idx, endPtr);if (typeof TextDecoder !== "undefined") {var u8txt = new TextDecoder("utf8").decode(u8),u8arr = new TextEncoder().encode(u8txt);if (Array.from(u8).join(',') != Array.from(u8arr).join(','))u8txt = new TextDecoder("gbk").decode(u8);console.log(u8txt);return u8txt;}`
+            )*/
+            .replace(
                 /\(\)\n?\s*\{\n?\s*var\s?\w+?\s?=\s?document\.getElementById\("fileInput"\);/g,
                 '(){return ;'
             ).replace(
@@ -102,10 +118,11 @@ var Module = new class NengeModule{
             ).replace(
                 /FS\.syncfs\(function\s?\(err\)\s?\{\}\)/g,
                 ';'
-            ).replace(
+            )
+            /*.replace(
                 /console\.log\("sokol_audio\.h:\s?sample rate\s?",\s?Module\._saudio_context\.sampleRate\);/,
-                'return Module.runaction("InitAudioContext",[sample_rate,num_channels, buffer_size,__saudio_emsc_pull,HEAPF32]);if(Module._saudio_node)return ;console.log("点击屏幕响应音乐");'
-            ).replace(
+                'return Module.runaction("InitAudioContext",[sample_rate,num_channels, buffer_size,__saudio_emsc_pull,HEAPF32]);'
+            )*/.replace(
                 /document\.createElement\("canvas"\)/g,
                 'Module.canvas'
             ).replace(
@@ -133,9 +150,15 @@ var Module = new class NengeModule{
         },
         InitAudioContext(sample_rate,num_channels, buffer_size,__saudio_emsc_pull,HEAPF32){
             let M = this,T=M.T;
-            if (M._saudio_context&&M._saudio_context.state === "suspended") {
-                return 0;
-            }
+            if (M._saudio_context){
+                if(M._saudio_context.state === "suspended"){
+                    M._saudio_context.resume();
+                    return 0;
+                }
+                return 1;
+            } 
+            M._saudio_node = null;
+            M._saudio_context = null;
             M._saudio_context = new AudioContext({
                 sampleRate: sample_rate,
                 latencyHint: "interactive"
@@ -158,6 +181,7 @@ var Module = new class NengeModule{
             M._saudio_context.resume();
             if (M._saudio_context.state === "suspended") {
                 T.on(document,'pointerdown',e=>{
+                    console.log('ok');
                     M._saudio_context.resume();
                 });
                 return 0
@@ -167,6 +191,7 @@ var Module = new class NengeModule{
         DiskReadyOut(){
             let M = this;
             M.ccall("se_load_settings");
+            M.$('.title').innerHTML = '';
             if(M.StartEMU){
                 M.StartEMU();
             }else{
@@ -181,6 +206,8 @@ var Module = new class NengeModule{
         },
         install_FS(){
             let M = this;
+            M.F.replaceWrite();
+            M.FS.createPath('/','rooms',!0,!0);
             M.runaction('addMount',["/offline"]);
             M.F.mountReady().then(e=>{
             });
@@ -200,6 +227,8 @@ var Module = new class NengeModule{
                 "showData":"View My Rooms",
                 "ShowFS":"View FileSystem",
                 "miniWin":"Mini Window",
+                "importBios":"import a bios",
+                "reloadPage":"refreash",
             },html="";
             html+='<li><a href="inline.html" target="_blank">inline run</a></li><li><a href="https://github.com/skylersaleh/SkyEmu" target="_blank">Github:skylersaleh/skyemu</a></li>';
             T.I.toArr(list,entry=>{
@@ -217,8 +246,11 @@ var Module = new class NengeModule{
             });
             MenuBtn.click(e=>{
                 if(this.emuElm.active) return this.emuElm.active = false;
+                T.stopEvent(e);
                 M.runaction('hideMenu',[!MenuBtn.active]);
             });
+            MenuBtn.on('touchstart',e=>T.stopEvent(e));
+            MenuBtn.on('touchend',e=>T.stopEvent(e));
             M.Nttr('.downbtn').click(e=>{
                 if(!M.FS || !M.GameName)return;
                 let path = "/offline/"+M.GameTitle+'.sav';
@@ -227,6 +259,9 @@ var Module = new class NengeModule{
                     if(u8&&u8 instanceof Uint8Array)T.down(M.GameTitle+'.sav',u8);
                 }
             });
+        },
+        reloadPage(){
+            location.reload();
         },
         hideMenu(active){
             let M=this,T=M.T,MenuBtn = M.Nttr('.menubtn'),menulist= M.Nttr('.menu-list');
@@ -305,6 +340,14 @@ var Module = new class NengeModule{
                 Array.from(files).forEach(async file=>{
                     M.F.MKFILE("/offline/"+M.GameTitle+".sav",new Uint8Array(await file.arrayBuffer()));
                     M.LocalGame = "/rooms/"+M.GameName;
+                });
+            },1);
+        },
+        importBios(){
+            let M=this,T=M.T;
+            M.upload(files=>{
+                Array.from(files).forEach(async file=>{
+                    M.F.MKFILE("/offline/"+M.GameTitle+".sav",new Uint8Array(await file.arrayBuffer()));
                 });
             },1);
         },
@@ -411,18 +454,17 @@ var Module = new class NengeModule{
         }
         myMount = [];
         mount(mount) {
-            let M = this;
-            if (!M.FS.analyzePath(mount.mountpoint).exists) {
-                M.FS.createPath('/', mount.mountpoint, !0, !0);
+            let D = this;
+            if (!D.FS.analyzePath(mount.mountpoint).exists) {
+                D.FS.createPath('/', mount.mountpoint, !0, !0);
             }
             let len = mount.mountpoint.split('/').length;
-            let node = M.MEMFS.createNode(len < 3 ? M.FS.root : null, len < 3 ? mount.mountpoint.split('/').pop() : mount.mountpoint.replace(/^\//, ''), 16384 | 511, 0);
-            if (M.getStore(mount)) {
-                if (!M.__mount) M.__mount = [];
-                M.__mount.push(M.syncfs(mount, txt => M.Module.runaction('DiskReadyOut', [txt])));
+            let node = D.MEMFS.createNode(len < 3 ? D.FS.root : null, len < 3 ? mount.mountpoint.split('/').pop() : mount.mountpoint.replace(/^\//, ''), 16384 | 511, 0);
+            if (D.getStore(mount)) {
+                if (!D.__mount) D.__mount = [];
+                D.__mount.push(D.syncfs(mount, txt => D.Module.runaction('DiskReadyOut', [txt])));
             }
             this.myMount.push(mount);
-            console.log(mount);
             return node;
         }
         mountReady() {

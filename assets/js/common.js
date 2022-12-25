@@ -40,9 +40,6 @@ const Nenge = new class NengeCores {
     get F() {
         return this.UTIL;
     }
-    get I() {
-        return this.is;
-    }
     get speed() {
         return 1000 / this.fps;
     }
@@ -190,6 +187,7 @@ const Nenge = new class NengeCores {
             };
         //delete ARG.store;
         if (Store && !ARG.unset) {
+            console.log(keyname);
             result = await Store.get(keyname, version, ARG);
             //console.log(result);
             if (result) {
@@ -217,7 +215,8 @@ const Nenge = new class NengeCores {
             response.body.cancel();
             return callback(headers);
         }
-        response = ARG.process ? F.StreamResponse(response, ARG) : response;
+        response = ARG.process ? await F.StreamResponse(response, ARG) : response;
+        if(ARG.unpack)ARG.type = 'arrayBuffer'; 
         ARG.type = ARG.type || 'arrayBuffer';
         let contents = await response[ARG.type]();
         let type = headers.type, filesize = headers["byteLength"] || 0, filetype = headers['content-type'];
@@ -244,22 +243,22 @@ const Nenge = new class NengeCores {
             }
         }
         if (Store && key !== keyname) {
+            console.log(type,ARG.type);
             if (I.u8obj(contents)) {
-                contents = new File([contents], urlname, {
-                    'type': ARG.mime || headers['content-type'] || F.gettype('')
-                });
+                contents = F.getFileText(contents,ARG.decode,ARG.mime || headers['content-type'] || F.gettype(''),urlname);
                 type = 'File';
             } else if (I.str(contents)) {
-                type = headers['content-type'] || 'text';
-            } else {
+                type = headers['content-type'] || 'String';
+            } else if(type =='datalist'){
                 let contents2;
                 await Promise.all(I.toArr(contents).map(async entry => {
-                    let [name, data] = entry, filename = name.split('/').pop(), filetype = F.gettype(filename), filedata = new File([data], filename, {
-                        'type': filetype
-                    });
+                    let [name, data] = entry,
+                        filename = name.split('/').pop(),
+                        filetype = F.gettype(filename),
+                        filedata = F.getFileText(data,ARG.decode,filetype,filename);
                     F.Libjs[filename] = filedata;
                     Store.put(ARG.key + filename, Object.assign({
-                        'contents': filedata, 'timestamp': T.date, 'filesize': data.byteLength, 'version': T.version, 'type': 'File'
+                        'contents': filedata, 'timestamp': T.date, 'filesize': data.byteLength, 'version': T.version,filetype,'type':filedata instanceof Blob? 'File':'String'
                     }, ARG.dataOption)
                     );
                     if (ARG.filename == filename) {
@@ -270,6 +269,11 @@ const Nenge = new class NengeCores {
                 if (contents2) contents = contents2;
                 contents2 = null;
                 Store = null;
+            }
+        }else if(ARG.decode){
+            contents = F.getFileText(contents,ARG.decode,type);
+            if(I.str(contents)){
+                type = 'String';
             }
         }
         if (Store) {
@@ -292,25 +296,15 @@ const Nenge = new class NengeCores {
             evt.forEach(val => ARG[val] && T.on(request, val, e => ARG[val](e, request)));
             if (!ARG.readystatechange) {
                 T.on(request, 'readystatechange', event => {
-                    switch (request.readyState) {
-                        case 0:
-                            break;
-                        case 1:
-                            break;
-                        case 2:
-                            break;
-                        case 3:
-                            break;
-                        case 4:
-                            if (request.status == 500) {
-                                request.dispatchEvent(new ErrorEvent('error', {
-                                    message: request.response
-                                }));
-                                throw request.response;
-                            }
-                            ARG.success && ARG.success(request.response, request.status, request, event);
-                            resolve(request.response);
-                            break;
+                    if(request.readyState==4){
+                        if (request.status == 500) {
+                            request.dispatchEvent(new ErrorEvent('error', {
+                                message: request.response
+                            }));
+                            throw request.response;
+                        }
+                        ARG.success && ARG.success(request.response, request.status, request, event);
+                        resolve(request.response);
                     }
                 });
             }
@@ -330,7 +324,7 @@ const Nenge = new class NengeCores {
     }
     runaction(action, data) {
         let T = this;
-        if (T.action[action]) {
+        if (T.action[action] instanceof Function) {
             if (!data) return T.action[action].call(T);
             if (T.I.array(data)) return T.action[action].apply(T, data);
             return T.action[action].call(T, data);
@@ -339,51 +333,57 @@ const Nenge = new class NengeCores {
         }
     }
     addJS(buf, cb, iscss,id) {
-            if(id&&this.$('#link_'+id))return;
-        let re = false, script = document.createElement(!iscss ? 'script' : 'link'), func = callback => {
+        let T = this,F=T.F;
+            if(id&&T.$('#link_'+id))return;
+        let re = false, script = T.$ce(!iscss ? 'script' : 'link'), func = callback => {
             if (!/^(blob:)?https?:\/\//.test(buf) && !/(\.js$|\.css$)/.test(buf)) {
                 re = true;
-                buf = this.F.URL(buf, this.F.gettype(!iscss ? 'js' : 'css'));
+                buf = F.URL(buf, F.gettype(!iscss ? 'js' : 'css'));
             }
             
             if (iscss) {
-                script.type = this.F.gettype('css');
+                script.type = F.gettype('css');
                 script.href = buf;
                 script.rel = "stylesheet";
             } else {
-                script.type = this.F.gettype('js');
+                script.type = F.gettype('js');
                 script.src = buf;
             }
             if(id)script.setAttribute('id','link_'+id);
             script.onload = e => {
                 callback && callback(e);
-                if (re) window.URL.revokeObjectURL(buf);
+                if (re) F.removeURL(buf);
                 buf = null;
             };
-            this.$(!iscss ? 'body' : 'head').appendChild(script);
+            document[!iscss ? 'body' : 'head'].appendChild(script);
         };
         if (!cb) return this.THEN((resolve, reject) => func(resolve, reject));
         else return func(cb), script;
 
     };
-    async loadScript(js,ARG) {
+    async loadScript(js,ARG,bool) {
         ARG = ARG||{};
-        let T = this, F = T.F, url = /^(\/|https?:\/\/|static\/js\/|data\/|assets)/.test(js) ? js : T.JSpath + js,
-        process = ARG.process&&(e=>ARG.process(`${T.getLang('installJS')}:${js} - ${e}`)),
-        version = ARG.version || T.version,
-        data = await T.FetchItem({ url, 'store':T.LibStore, 'key':F.LibKey,version,process});
-        await T.addJS(data);
-        process = null;
+        let T = this, F = T.F, url = F.getpath(js);
+        ARG.url = F.getpath(js);
+        if(bool){
+            ARG.type = 'text';
+        }else{
+            ARG.store = T.LibStore;
+            ARG.key = F.LibKey;
+            ARG.version = ARG.version || T.version;
+            if(ARG.process){
+                let process = ARG.process;
+                ARG.process&&(e=>process(`${T.getLang('installJS')}:${js} - ${e}`))
+            }
+        }
+        let data = await T.FetchItem({ url,ARG});
+        if(!bool){
+            return await T.addJS(data); 
+        }
         return data;
     }
     async getScript(js,ARG){
-        ARG = ARG||{};
-        let T = this, F = T.F, url = /^(\/|https?:\/\/|static\/js\/|data\/|assets)/.test(js) ? js : T.JSpath + js;
-        ARG.type = 'text';
-        ARG.url = url;
-        let data = await T.FetchItem(ARG);
-        if(ARG.replaceJs)data = ARG.replaceJs(data);
-        return data;
+        return this.loadScript(js,ARG,!0);
     }
     async addScript(js,ARG){
         return await T.addJS(await T.getScript(js,ARG));
@@ -394,7 +394,7 @@ const Nenge = new class NengeCores {
     unFile(u8, process, ARG) {
         return this.F.unFile(u8, Object.assign({ process }, ARG||{}));
     }
-    is = new class NengeType {
+    I = new class NengeType {
         formdata = (obj) => new FormData(obj || undefined);
         formget = obj => new URLSearchParams(obj);
         get mobile() {
@@ -506,11 +506,9 @@ const Nenge = new class NengeCores {
         Libjs = {};
         LibKey = 'script-';
         LibUrl = {};
-        StreamResponse(response, ARG) {
+        async StreamResponse(response, ARG) {
             let num = s => Number(s), downsize = num(response.headers.get('content-length') || 0), downtext = ARG && ARG.downtext ? ARG.downtext : '进度:', havesize = 0, status = {
                 done: !1, value: !1
-            }, getStatus = async () => {
-                status = await reader.read()
             }, reader = response.body.getReader();
             return new Response(new ReadableStream({
                 async start(ctrler) {
@@ -525,7 +523,7 @@ const Nenge = new class NengeCores {
                         else statustext = downtext + Math.floor(havesize * 10 / 1024) / 10 + 'KB';
                         //下载进度
                         ARG && ARG.process && ARG.process(statustext, downsize, havesize, speedsize);
-                        await getStatus();
+                        status = await reader.read();
                     }
                     ctrler.close();
                 }
@@ -735,6 +733,28 @@ const Nenge = new class NengeCores {
         }
         getname(str) {
             return (str || '').split('/').pop().split('?')[0];
+        }
+        getpath(js){
+            let F = this,T=F.T,I=T.I;
+            return /^(\/|https?:\/\/|static\/js\/|data\/|assets|blob\:)/.test(js) ? js : T.JSpath + js;
+        }
+        getFileText(contents,decode,filetype,filename){
+            let F = this,T=F.T,I=T.I;
+            if(filename&&!decode&&!(/(text|javascript)/.test(filetype))){
+                return new File([contents], filename, {'type': filetype});
+            }
+            if(!decode)return contents;
+            if(filetype == 'datalist'){
+                I.toArr(contents,entry=>{
+                    if(/(text|javascript)/.test(F.gettype(entry[0]))){
+                        contents[entry[0]] =  decode(entry[1]);
+                    }
+                });
+            }else if(I.u8obj(contents)){
+               return decode(contents);
+            }
+            return contents;
+
         }
         gettype(type) {
             let F = this;
@@ -1298,8 +1318,7 @@ const Nenge = new class NengeCores {
         );
     }
     getLang(name) {
-        if (this.lang && this.lang[name]) return this.lang[name];
-        return name;
+        return this.lang&&this.lang[name]||name;
     }
     THEN(f) {
         return new Promise(f);
@@ -1325,172 +1344,174 @@ const Nenge = new class NengeCores {
         navigator.vibrate(duration||200);
     }
     */
+   Nttr = class Nttr {
+    constructor(obj, T) {
+        let Nttr = this, I = T.I;
+        I.defines(Nttr, { T, I, obj }, 1);
+        I.defines(obj, { Nttr }, 1);
+    }
+    eventList = {};
+    get cList() {
+        return this.obj.classList;
+    }
+    get active() {
+        return this.contains('active')
+    }
+    set active(bool) {
+        this.cList[bool ? 'add' : 'remove']('active')
+        return this;
+    }
+    get show() {
+        return this.contains('show')
+    }
+    set show(bool) {
+        this.cList[bool ? 'add' : 'remove']('show')
+        return this;
+    }
+    get hidden() {
+        return this.obj.hidden;
+    }
+    set hidden(bool) {
+        this.obj.hidden = bool;
+        return this;
+    }
+    get attrs() {
+        return this.getAttrs();
+    }
+    set attrs(obj) {
+        this.setAttrs(obj);
+        return this;
+    }
+    get css() {
+        return this.obj.style.cssText;
+    }
+    set css(text) {
+        return this.obj.style.cssText = text;
+    }
+    get style() {
+        return this.I.toObj(this.obj.style);
+    }
+    set style(data) {
+        if (this.I.str(data)) return this.css = data;
+        Object.assign(this.obj.style, data);
+    }
+    html(str) {
+        if (str != undefined){
+            this.obj.innerHTML = str;
+            return this;
+        }
+        return this.obj.innerHTML;
+    }
+    $(str) {
+        return this.obj.querySelector(str);
+    }
+    $$(str) {
+        return this.obj.querySelectorAll(str);
+    }
+    contains(name) {
+        return this.cList.contains(name);
+    }
+    attr(k, v) {
+        if (typeof v == 'undefined') return this.obj.getAttribute(k);
+        if (v == null) return this.obj.removeAttribute(k)
+        this.obj.setAttribute(k, v);
+        return this;
+    }
+    getAttrs(name) {
+        if (name) return this.attr(name);
+        return Object.fromEntries(Array.from(this.obj.attributes || []).map(attr => [attr.name, attr.value]));
+    }
+    setAttrs(attr, value) {
+        if (attr.constructor === Object) {
+            Object.entries(attr).forEach(entry => this.attr(entry[0], entry[1]));
+        } else {
+            this.attr(attr, value);
+        }
+        return this;
+    }
+    addClass(str) {
+        this.cList.add(str);
+        return this;
+    }
+    removeClass(str) {
+        this.cList.remove(str);
+        return this;
+    }
+    addChild(obj) {
+        this.obj.appendChild(obj);
+        return this;
+    }
+    on(evt, func, opt) {
+        let N = this;
+        if (!N.eventList[evt]) N.eventList[evt] = [];
+        N.eventList[evt].push({ func, opt });
+        return N.T.on(N.obj, evt, func, opt), N;
+    }
+    un(evtname, evtfunc) {
+        let N = this;
+        if (N.eventList[evtname]) {
+            let newlist = [];
+            N.eventList[evtname].forEach(val => {
+                let { func, opt } = val;
+                if (evtfunc && evtfunc != func) {
+                    newlist.push(val);
+                    return
+                }
+                N.removeEvent(evtname, func, opt);
+            });
+            N.eventList[evtname] = [];
+            if (newlist.length > 0) N.eventList[evtname] = newlist;
+        } else if (!evtname) {
+            N.I.toArr(N.eventList, entry => {
+                entry[1].forEach(val => {
+                    let { func, opt } = val;
+                    N.removeEvent(entry[0], func, opt);
+                });
+                delete N.eventList[entry[0]];
+            });
+        }
+        return N;
+    }
+    once(evt, func, cap) {
+        return this.T.once(this.obj, evt, func, cap), N;
+    }
+    removeEvent(evt, func, opt) {
+        return this.T.un(this.obj, evt, func, opt);
+    }
+    triger(type, opt) {
+        let N = this, data = Object.assign({}, opt || {}, { target: N.obj });
+        if (N.eventList[type]) N.eventList[type].forEach(val => val.func.call(N.obj, data));
+        else N.T.triger(N.obj, type, data);
+    }
+    dispatch(evt) {
+        this.obj.dispatchEvent(evt);
+    }
+    bind(opt, evt) {
+        let N = this, T = N.T, I = N.I, type = evt || 'pointerup';
+        I.toArr(opt, entry => T.on(N.$(entry[0], this.obj), type, entry[1]));
+    }
+    click(func, evt, opt) {
+        let N = this, type = evt || 'pointerup';
+        if (func instanceof Function) N.un(type), N.on(type, func, opt || false);
+        else N.triger(type, func);
+        return N;
+    }
+    getBoundingClientRect() {
+        return this.obj.getBoundingClientRect();
+    }
+    remove() {
+        this.un();
+        this.obj.remove();
+    }
+    get children(){
+        return Array.from(this.obj.children);
+    }
+}
 };
 const Nttr = (obj) => {
     let T = Nenge, elm = T.$(obj);
-    return elm ? !elm.Nttr ? new class {
-        constructor(obj, T) {
-            let Nttr = this, I = T.I;
-            I.defines(Nttr, { T, I, obj }, 1);
-            I.defines(obj, { Nttr }, 1);
-        }
-        eventList = {};
-        get cList() {
-            return this.obj.classList;
-        }
-        get active() {
-            return this.contains('active')
-        }
-        set active(bool) {
-            this.cList[bool ? 'add' : 'remove']('active')
-            return this;
-        }
-        get show() {
-            return this.contains('show')
-        }
-        set show(bool) {
-            this.cList[bool ? 'add' : 'remove']('show')
-            return this;
-        }
-        get hidden() {
-            return this.obj.hidden;
-        }
-        set hidden(bool) {
-            this.obj.hidden = bool;
-            return this;
-        }
-        get attrs() {
-            return this.getAttrs();
-        }
-        set attrs(obj) {
-            this.setAttrs(obj);
-            return this;
-        }
-        get css() {
-            return this.obj.style.cssText;
-        }
-        set css(text) {
-            return this.obj.style.cssText = text;
-        }
-        get style() {
-            return this.I.toObj(this.obj.style);
-        }
-        set style(data) {
-            if (this.I.str(data)) return this.css = data;
-            Object.assign(this.obj.style, data);
-        }
-        html(str) {
-            if (str != undefined){
-                this.obj.innerHTML = str;
-                return this;
-            }
-            return this.obj.innerHTML;
-        }
-        $(str) {
-            return this.obj.querySelector(str);
-        }
-        $$(str) {
-            return this.obj.querySelectorAll(str);
-        }
-        contains(name) {
-            return this.cList.contains(name);
-        }
-        attr(k, v) {
-            if (typeof v == 'undefined') return this.obj.getAttribute(k);
-            if (v == null) return this.obj.removeAttribute(k)
-            this.obj.setAttribute(k, v);
-            return this;
-        }
-        getAttrs(name) {
-            if (name) return this.attr(name);
-            return Object.fromEntries(Array.from(this.obj.attributes || []).map(attr => [attr.name, attr.value]));
-        }
-        setAttrs(attr, value) {
-            if (attr.constructor === Object) {
-                Object.entries(attr).forEach(entry => this.attr(entry[0], entry[1]));
-            } else {
-                this.attr(attr, value);
-            }
-            return this;
-        }
-        addClass(str) {
-            this.cList.add(str);
-            return this;
-        }
-        removeClass(str) {
-            this.cList.remove(str);
-            return this;
-        }
-        addChild(obj) {
-            this.obj.appendChild(obj);
-            return this;
-        }
-        on(evt, func, opt) {
-            let N = this;
-            if (!N.eventList[evt]) N.eventList[evt] = [];
-            N.eventList[evt].push({ func, opt });
-            return N.T.on(N.obj, evt, func, opt), N;
-        }
-        un(evtname, evtfunc) {
-            let N = this;
-            if (N.eventList[evtname]) {
-                let newlist = [];
-                N.eventList[evtname].forEach(val => {
-                    let { func, opt } = val;
-                    if (evtfunc && evtfunc != func) {
-                        newlist.push(val);
-                        return
-                    }
-                    N.removeEvent(evtname, func, opt);
-                });
-                N.eventList[evtname] = [];
-                if (newlist.length > 0) N.eventList[evtname] = newlist;
-            } else if (!evtname) {
-                N.I.toArr(N.eventList, entry => {
-                    entry[1].forEach(val => {
-                        let { func, opt } = val;
-                        N.removeEvent(entry[0], func, opt);
-                    });
-                    delete N.eventList[entry[0]];
-                });
-            }
-            return N;
-        }
-        once(evt, func, cap) {
-            return this.T.once(this.obj, evt, func, cap), N;
-        }
-        removeEvent(evt, func, opt) {
-            return this.T.un(this.obj, evt, func, opt);
-        }
-        triger(type, opt) {
-            let N = this, data = Object.assign({}, opt || {}, { target: N.obj });
-            if (N.eventList[type]) N.eventList[type].forEach(val => val.func.call(N.obj, data));
-            else N.T.triger(N.obj, type, data);
-        }
-        dispatch(evt) {
-            this.obj.dispatchEvent(evt);
-        }
-        bind(opt, evt) {
-            let N = this, T = N.T, I = N.I, type = evt || 'pointerup';
-            I.toArr(opt, entry => T.on(N.$(entry[0], this.obj), type, entry[1]));
-        }
-        click(func, evt, opt) {
-            let N = this, type = evt || 'pointerup';
-            if (func instanceof Function) N.un(type), N.on(type, func, opt || false);
-            else N.triger(type, func);
-            return N;
-        }
-        getBoundingClientRect() {
-            return this.obj.getBoundingClientRect();
-        }
-        remove() {
-            this.un();
-            this.obj.remove();
-        }
-        get children(){
-            return Array.from(this.obj.children);
-        }
-    }(elm, T) : elm.Nttr : undefined;
+    if(obj instanceof T.Nttr) return obj;
+    return elm ? !elm.Nttr ? new T.Nttr(elm, T) : elm.Nttr : undefined;
 }
 const N = new class {
     constructor(T) {

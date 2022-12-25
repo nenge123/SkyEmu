@@ -11,10 +11,10 @@ Nenge.docload(function(){
     T.action['TAG-EMU-SKYEMU'] = async (elm,status)=>{
         if(status=='connect'){
             elm.txt = elm.innerHTML;
-            Nttr(elm).addClass('loading');
+            Nttr(elm).addClass('runskyemu');
             elm.JSpath = T.JSpath.split('/').slice(0, -2).join('/') + '/vba/';
             T.once(elm,'pointerup',async()=>{
-                Nttr(elm).removeClass('loading');
+                Nttr(elm).removeClass('runskyemu');
             elm.innerHTML='请稍等!';
             let loaderjs = await T.getScript('assets/SkyEmu/emu-loader.js?t='+T.time,{process:e=>{
                 elm.innerHTML = '加载引导文件:'+e;
